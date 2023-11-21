@@ -30,6 +30,7 @@ def main():
     else:
         print("No devices connected")
         exit()
+        
     
 
 
