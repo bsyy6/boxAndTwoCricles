@@ -1,5 +1,5 @@
 import nidaqmx
-from statistics import mode, mean
+from statistics import mode, mean,median
 import time
 class DAQHandler:
     '''
@@ -150,11 +150,14 @@ class DAQHandler:
         data = self.task.read(number_of_samples_per_channel=number_of_samples_per_channel)
         return mode(data)
     
-    def moving_mode(self,n):
-        self.data.append(self.read_voltage(number_of_samples_per_channel = n//2))
+    def moving_median(self,n):
+        self.data.append(self.read_voltage())
         if len(self.data) > n:
-            self.data = self.data[-n]      
-        return mode(self.data)
+            self.data = self.data[-n:]      
+        if(len(self.data)== 1):
+            return self.data[0]
+        else:
+            return median(self.data)
     
     def read_voltage_mean(self, number_of_samples_per_channel):
         '''

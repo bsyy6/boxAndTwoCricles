@@ -47,16 +47,15 @@ def main():
                 running = False
 
         # graphics_handler.draw(voltage)
-        #voltage = daq_handler.read_voltage_mode(500)
-        voltage = daq_handler.read_voltage()
+        #voltage = daq_handler.read_voltage()
+        voltage = daq_handler.moving_median(100)
         voltage = min(daq_handler.minv, max(daq_handler.maxv, voltage))
         x_input = mapper(voltage)
-        #graphics_handler.draw(x_input)
+        graphics_handler.draw(x_input)
 
         # Update x and y data lists
         y_data.append(voltage)
         x_data.append(len(x_data)+1)
-
 
         readings_count += 1
         current_time = time.perf_counter_ns()
