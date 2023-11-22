@@ -3,44 +3,43 @@ from graphics import GraphicsHandler
 from scipy.interpolate import interp1d
 import pygame
 import time
-import nidaqmx
+import threading
+import matplotlib.pyplot as plt
+
 def main():
+
+
+    # Initialize Matplotlib plot
+    plt.ion()  # Turn on interactive mode for live plotting
+    fig, ax = plt.subplots()
+    line, = ax.plot([], [], 'b-', label='Voltage')  # Create an empty plot line
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Voltage')
+    ax.legend()
+
     pygame.init()
     
-    daq_handler = DAQHandler("Dev3/ai0")  # Replace with actual channel
     graphics_handler = GraphicsHandler(800, 600)
+    daq_handler = DAQHandler("Dev3/ai0")
     
-    # ask user for min and max voltage
-    device_buffer_size = 10
-    device_buffer = bytearray(device_buffer_size)
-    # get all devices connected
-    if(nidaqmx.system.System.local().devices.device_names):
-        print("Devices connected: ")
-        devices = nidaqmx.system.System.local().devices
-        for i, dev in enumerate(devices.device_names):
-            # print device and number
-            print(f"[{i}] {dev}")
-        selection = input("Please select a device number: ")
-        while not (selection.isdigit() and 0 <= int(selection) < len(devices.device_names)):
-            print("Invalid input. Please enter a valid device number.")
-            selection = input("Please select a device number: ")
+    accepted = False
+    while(not accepted):
+        daq_handler.getMax()
+        daq_handler.getMin() 
+        print(f"Open: {daq_handler.maxv} Close: {daq_handler.minv}")
+        accepted = input("Are these values acceptable? (y/n) ") == "y"
 
-        selected_device = devices.device_names[int(selection)]
-        print(f"Selected device: {selected_device}")
-    else:
-        print("No devices connected")
-        exit()
-        
-    
-
-
-    mapper = interp1d([0.6, 1.8], [0,10])
+    mapper = interp1d([daq_handler.minv, daq_handler.maxv], [graphics_handler.x_max,graphics_handler.x_min])
     readings_count = 0
     
     start_time = time.perf_counter_ns()
 
 
+
+
     running = True
+    x_data = []  # Initialize empty lists for x and y data
+    y_data = []
     while running:
 
         for event in pygame.event.get():
@@ -48,22 +47,30 @@ def main():
                 running = False
 
         # graphics_handler.draw(voltage)
-        voltage = daq_handler.read_voltage_mode(100)
-        time.sleep(1)
-        # limit voltage to 0.6 to 1.8
-        voltage = min(1.8, max(0.6, voltage))
+        #voltage = daq_handler.read_voltage_mode(500)
+        voltage = daq_handler.read_voltage()
+        voltage = min(daq_handler.minv, max(daq_handler.maxv, voltage))
         x_input = mapper(voltage)
-        graphics_handler.draw(x_input)
-        # print voltage and x_input 
-        
+        #graphics_handler.draw(x_input)
+
+        # Update x and y data lists
+        y_data.append(voltage)
+        x_data.append(len(x_data)+1)
+
+
         readings_count += 1
         current_time = time.perf_counter_ns()
         if readings_count % 10 == 0:
             elapsed_time = current_time - start_time
             if elapsed_time != 0:
                 frequency = readings_count / elapsed_time / 1e-9
-                # print(f"Average frequency: {frequency:.2f} Hz Voltage: {x_input:.2f}")
+                print(f"Average frequency: {frequency:.2f} Voltage: {voltage:.2f} X: {x_input:.2f}")
 
+    line.set_data(x_data,y_data)  # Set new data for the plot
+    ax.relim()  # Update the limits of the plot
+    ax.autoscale_view(True, True, True)  # Autoscale the view
+    plt.pause(0.0001)
+    
     daq_handler.close()
     graphics_handler.close()
 

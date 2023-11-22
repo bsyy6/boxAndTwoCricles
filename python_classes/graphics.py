@@ -48,8 +48,6 @@ class GraphicsHandler:
         self.dCircle = self.CirclePos_max - self.CirclePos_min
 
         # define voltage parameters
-        self.minV = 0
-        self.maxV = 3
         self.x_touchPoint = 4
         self.x_max = 10
         self.x_min = 0
