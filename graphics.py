@@ -2,131 +2,105 @@ import pygame
 import numpy as np
 from scipy.interpolate import interp1d
 
-def fcn(v_input, y_input, yPosIn_box, yPosIn_circle):
-    """
-    % Waleed - 2023
-    % This function moves two circles towards a box and squeezes them against it.
-    %
-    % args:
-    % x is the scaled voltage from the ADC.
-    % MUST BE 0 minimum 10 maximum. change code for other ranges.
-    % 
-    % returns:
-    % this code shows x = 0->3.999 as the free movment of the cricles towards the box.
-    % 4 means it touched the object
-    % 4-10 the balls squeeze against the box:
-    %
-    %  To do:
-    %  - Linearly changing the box color.
-    %  - Scaling the cricles to show them squeezing.
-    """
-
-
-    # Initialize Pygame
-    pygame.init()
-
-    # Pygame window setup
-    screen_width, screen_height = 800, 600
-    screen = pygame.display.set_mode((screen_width, screen_height))
-    clock = pygame.time.Clock()
-    midY = screen_height / 2
-    midX = screen_width / 2
-
-    # Define colors
-    black = (0, 0, 0)
-    white = (255, 255, 255)
-   
-    # Define parameters
-    max_scale = 0.1 
-    intersection = 0.1
-    startColor = (0, 0, 0)
-    finalColor = (255, 255, 255)
-    dColor = tuple(np.subtract(finalColor,startColor))
-    
-    circleRadius = 50
-    box_width = 200
-    
-    minV = 0
-    maxV = 3
-
-
-    x_touchPoint = 4
-    x_max = 10
-    x_min = 0
-
-    # box pos is calculated from the left top corner of screen to the left top corner of the box
-    xPos_Box = midX - box_width / 2
-    yPos_Box = midY - box_width / 2
-
-    # circle pos is calculated the left top corner of screen to the center of the circle
-    xPos_CirL = midX - (box_width / 2 + circleRadius)
-    xPos_CirR = midX + (box_width / 2 + circleRadius)
-    yPos_Cir = midY
-
-    # map the input voltage to the x values between 0(x_min) and 10(x_max)
-
-    mapper = interp1d([minV, maxV], [x_min,x_max])
-    #x_input = float(mapper(v_input))
-    x_input = v_input # debugging
-    
-    
-    
-    CirclePos_max =  screen_width/2  - box_width/2 - circleRadius
-    CirclePos_min =  screen_width/4 - circleRadius
-    dCircle = CirclePos_max - CirclePos_min
-    circleSurface = pygame.Surface((circleRadius * 2, circleRadius * 2), pygame.SRCALPHA)
-    # circleSurface.fill((250,200,0))
-    squareSurface = pygame.Surface((box_width, box_width), pygame.SRCALPHA)
-    pygame.draw.circle(circleSurface, white, (circleRadius,circleRadius), circleRadius)
-    pygame.draw.rect(squareSurface, white, (0,0,box_width,box_width))
-    
-    squeezing = (x_input >= x_touchPoint)
-    if squeezing:
-        vibrate = False
-        portion =  (x_input - x_touchPoint) / (x_max - x_touchPoint)
-        scale = max_scale * portion
-        scale = scale + 1
-        circleRaduisH = round(circleRadius/scale)
-        xPos_CirL = xPos_Box - circleRaduisH * (1 - intersection*portion) +1
-        if portion > 0.9:
-            color = finalColor
-        else:
-            color = startColor 
-    else:
-        vibrate = True
-        portion =  (x_input - x_min) / (x_touchPoint - x_min)
-        scale = 1 # 1 is no scale
-        xPos_CirL = CirclePos_min + dCircle* portion
-        color = startColor
-    
-    xPos_CirR = screen_width - xPos_CirL
-    
-
-
-    
-    running = True
-    while running:
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-        screen.fill(black)  # Clear screen
-
-        # Logic for circles and box animation goes here
-
-        # screen.blit(scaled_surface, (width // 2 - 50, height // 2 - int(100 * 1.5) // 2))  # Place the oval in the center
-        if(not vibrate):
-            circleSurface = pygame.transform.scale_by(circleSurface, (1/scale, scale))
-            vibrate = True
+class GraphicsHandler:
+    def __init__(self, width = 800, height=600):
+        self.width = width
+        self.height = height
+        self.screen = pygame.display.set_mode((self.width, self.height))
         
-        screen.blit(circleSurface, (round(xPos_CirR-circleRadius/scale), yPos_Cir-circleRadius*scale)) 
-        screen.blit(circleSurface, (round(xPos_CirL-circleRadius/scale), yPos_Cir-circleRadius*scale))
-        screen.blit(squareSurface, (xPos_Box, yPos_Box))
+        self.midX = self.width / 2
+        self.midY = self.height / 2
 
-        pygame.display.flip()  # Update the display
-        clock.tick(60)  # Control frame rate
+        # colors
+        self.black = (0, 0, 0)
+        self.white = (255, 255, 255)
+        self.red = (255, 0, 0)
+        self.green = (0, 255, 0)
+        self.blue = (0, 0, 255)
 
-    pygame.quit()
+        # interaction parameters
+        self.max_scale = 0.1
+        self.intersection = 0.1
+        self.startColor = self.black
+        self.finalColor = self.white
+        self.dcolor = tuple(np.subtract(self.finalColor,self.startColor))
 
-fcn(3.9,0,0,0)
+        # define box parameters
+        self.box_width = 200
+        self.box = self.makeBox(self.box_width,self.white)
+        # position on screen
+        self.xPos_Box = self.midX - self.box_width / 2
+        self.yPos_Box = self.midY - self.box_width / 2
+
+        # define circle parameters
+        self.circle_radius = 50
+        self.circle = self.makeCircle(self.circle_radius,self.red)
+
+        # postion on screen
+        self.xPos_CirL = self.midX - (self.box_width / 2 + self.circle_radius)
+        self.xPos_CirR = self.midX + (self.box_width / 2 + self.circle_radius)
+        self.yPos_Cir = self.midY
+        
+
+        # define circle position parameters
+        self.CirclePos_max =  self.width/2  - self.box_width/2 - self.circle_radius
+        self.CirclePos_min =  self.width/4  - self.circle_radius
+        self.dCircle = self.CirclePos_max - self.CirclePos_min
+
+        # define voltage parameters
+        self.x_touchPoint = 4
+        self.x_max = 10
+        self.x_min = 0
+
+
+    def makeBox(self, box_width, color):
+        box = pygame.Surface((box_width, box_width), pygame.SRCALPHA)
+        pygame.draw.rect(box, color, (0, 0, box_width, box_width))
+        return box
+       
+    def makeCircle(self,r,color):
+        circle = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+        pygame.draw.circle(circle, color, (r, r), r)
+        return circle
+
+    def draw_circle(self, color):
+        pygame.draw.circle(self.window, color, (self.circle_x, self.circle_y), self.circle_radius)
+        
+    def draw_box(self, color):
+        pygame.draw.rect(self.window, color, (self.xPos_Box, self.yPos_Box, self.box_width, self.box_width))
+    
+    
+    def updatePosition(self, x_input):
+        squeezing = (x_input >= self.x_touchPoint)
+        if squeezing:
+            vibrate = False
+            portion =  (x_input - self.x_touchPoint) / (self.x_max - self.x_touchPoint)
+            scale = self.max_scale * portion
+            self.scale = scale + 1
+            circleRaduisH = round(self.circle_radius/self.scale)
+            xPos_CirL = self.xPos_Box - circleRaduisH * (1 - self.intersection*portion) +1
+            if portion > 0.9:
+                color = self.finalColor
+            else:
+                color = self.startColor 
+        else:
+            vibrate = True
+            portion =  (x_input - self.x_min) / (self.x_touchPoint - self.x_min)
+            self.scale = 1 # 1 is no scale
+            xPos_CirL = self.CirclePos_min + self.dCircle* portion
+            color = self.startColor
+        
+        xPos_CirR = self.width - xPos_CirL
+        return xPos_CirL, xPos_CirR, color
+
+    def draw(self, x_input):
+        self.xPos_CirL, self.xPos_CirR, color = self.updatePosition(x_input)
+        self.screen.fill(self.black)
+        self.screen.blit(self.circle, (round(self.xPos_CirR-self.circle_radius/self.scale), self.yPos_Cir-self.circle_radius*self.scale)) 
+        self.screen.blit(self.circle, (round(self.xPos_CirL-self.circle_radius/self.scale), self.yPos_Cir-self.circle_radius*self.scale))
+        self.screen.blit(self.box, (self.xPos_Box, self.yPos_Box))
+        pygame.display.flip()
+
+    def close(self):
+        pygame.quit()
+
