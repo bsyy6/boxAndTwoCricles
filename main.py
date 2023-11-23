@@ -4,74 +4,86 @@ from scipy.interpolate import interp1d
 import pygame
 import time
 import threading
-import matplotlib.pyplot as plt
+
+
+# global
+fps = 0 # the fps counter 
+closeThread = False
 
 def main():
-
-
-    # Initialize Matplotlib plot
-    plt.ion()  # Turn on interactive mode for live plotting
-    fig, ax = plt.subplots()
-    line, = ax.plot([], [], 'b-', label='Voltage')  # Create an empty plot line
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Voltage')
-    ax.legend()
+    
+    global closeThread
+    global fps
 
     pygame.init()
     
     graphics_handler = GraphicsHandler(800, 600)
-    daq_handler = DAQHandler("Dev3/ai0")
+    AnalogInput = DAQHandler("Dev3/ai0")
+    
+    DOut = DAQHandler("Dev3/port0/line0")
     
     accepted = False
+
     while(not accepted):
-        daq_handler.getMax()
-        daq_handler.getMin() 
-        print(f"Open: {daq_handler.maxv} Close: {daq_handler.minv}")
+        AnalogInput.getMax()
+        AnalogInput.getMin() 
+        print(f"Open: {AnalogInput.maxv} Close: {AnalogInput.minv}")
         accepted = input("Are these values acceptable? (y/n) ") == "y"
 
-    mapper = interp1d([daq_handler.minv, daq_handler.maxv], [graphics_handler.x_max,graphics_handler.x_min])
-    readings_count = 0
+    mapper = interp1d([AnalogInput.minv, AnalogInput.maxv], [graphics_handler.x_max,graphics_handler.x_min])
     
-    start_time = time.perf_counter_ns()
 
+    # start voltage reader thread
+    voltage_reader_thread = threading.Thread(target=voltage_reader, args=(AnalogInput, DOut,mapper, graphics_handler), daemon=True)
+    voltage_reader_thread.start()
 
-
+    # graphics loop
+    clock = pygame.time.Clock()
+    FPS = 60
+    screen_refresh_count = 0
+    screen_start_time = time.time()
 
     running = True
-    x_data = []  # Initialize empty lists for x and y data
-    y_data = []
     while running:
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-        # graphics_handler.draw(voltage)
-        #voltage = daq_handler.read_voltage()
-        voltage = daq_handler.moving_median(100)
-        voltage = min(daq_handler.minv, max(daq_handler.maxv, voltage))
-        x_input = mapper(voltage)
-        graphics_handler.draw(x_input)
+        graphics_handler.draw()
 
-        # Update x and y data lists
-        y_data.append(voltage)
-        x_data.append(len(x_data)+1)
-
-        readings_count += 1
-        current_time = time.perf_counter_ns()
-        if readings_count % 10 == 0:
-            elapsed_time = current_time - start_time
-            if elapsed_time != 0:
-                frequency = readings_count / elapsed_time / 1e-9
-                print(f"Average frequency: {frequency:.2f} Voltage: {voltage:.2f} X: {x_input:.2f}")
-
-    line.set_data(x_data,y_data)  # Set new data for the plot
-    ax.relim()  # Update the limits of the plot
-    ax.autoscale_view(True, True, True)  # Autoscale the view
-    plt.pause(0.0001)
+        screen_refresh_count += 1
+        screen_current_time = time.time()
+        elapsed_time = screen_current_time - screen_start_time
+        if(elapsed_time > 1):
+            fps = screen_refresh_count / elapsed_time
+            screen_refresh_count = 0
+            screen_start_time = screen_current_time
+        
+        clock.tick(FPS)        
     
-    daq_handler.close()
+    closeThread = True
+    AnalogInput.close()
     graphics_handler.close()
+
+# runs in different thread
+def voltage_reader(AnalogInput, DigitalOutput, mapper ,graphics_handler):
+    daq_start_time = time.perf_counter_ns()
+    daq_readings_count = 0; 
+    while not closeThread:
+        voltage = AnalogInput.moving_median(100)
+        voltage = min(AnalogInput.minv, max(AnalogInput.maxv, voltage))
+        x_input = mapper(voltage)
+        graphics_handler.updatePosition(x_input)
+        DigitalOutput.task.write(bool(graphics_handler.vibrate))
+        daq_readings_count += 1
+        daq_current_time = time.perf_counter_ns()
+        if daq_readings_count % 10 == 0:
+            elapsed_time = daq_current_time - daq_start_time
+            if elapsed_time != 0:
+                frequency = daq_readings_count / elapsed_time / 1e-9
+                print(f"Daq: {frequency:.2f} Hz | {fps:.2f} FPS")
+
 
 if __name__ == "__main__":
     main()

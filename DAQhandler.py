@@ -70,6 +70,7 @@ class DAQHandler:
         if channel is None:
             foundDaq = self.init_daq()
         else:
+            self.channelType = self.checkChannelValidName(channel)
             if(self.checkChannelValidName(channel)):
                 self.channel = channel
                 foundDaq = True
@@ -79,7 +80,7 @@ class DAQHandler:
         
         if foundDaq:
             self.task = nidaqmx.Task()
-            self.task.ai_channels.add_ai_voltage_chan(self.channel, terminal_config=terminal_config, min_val=min_val, max_val=max_val)
+            self.add_channel(self.channel, terminal_config=terminal_config, min_val=min_val, max_val=max_val)
             self.data = [] # for moving fitlers
             print("connected")
         else:
@@ -113,6 +114,7 @@ class DAQHandler:
                     print("Invalid input. Please enter a valid channel number.")
                     selection = input("Please select a channel number: ")
             self.channel = channels[int(selection)]
+            self.channelType = self.checkChannelValidName(self.channel)
             print(f"Connecting to: {self.channel}")
             return True
         else:
@@ -121,22 +123,34 @@ class DAQHandler:
         
     def checkChannelValidName(self, channel):
         '''
-        checks if the channel name is valid Dev3/ai0 for example
+        checks if the channel name is valid Dev3/ai0 or Dev3/port0/line0 or for example 
+
+        returns D for digital and A for analog and None if invalid
         '''
         # 1) check it includes a /
         if "/" not in channel:
-            return False
+            return None
         else:
             device_name = channel.split("/")[0]
-            return (channel in nidaqmx.system.System.local().devices[device_name].ai_physical_chans.channel_names)
+            if (channel in nidaqmx.system.System.local().devices[device_name].ai_physical_chans.channel_names):
+                return "A"
+            if ( channel in nidaqmx.system.System.local().devices[device_name].di_lines.channel_names):
+                return "D"
+            if (channel in nidaqmx.system.System.local().devices[device_name].do_lines.channel_names):
+                return "D"
+            else:
+                return None
             
     def add_channel(self, channel , terminal_config = nidaqmx.constants.TerminalConfiguration.RSE , min_val = -10, max_val = 10):
         '''
         adds a channel to the task
         '''
-        self.task.ai_channels.add_ai_voltage_chan( channel ,terminal_config = terminal_config, min_val = min_val, max_val = max_val)
-        
+        if(self.channelType=="D"):
+            self.task.do_channels.add_do_chan(channel)
+        if(self.channelType=="A"):
+            self.task.ai_channels.add_ai_voltage_chan( channel ,terminal_config = terminal_config, min_val = min_val, max_val = max_val)
 
+    
     def read_voltage(self):
         '''
         simple read function one sample at a time
@@ -185,3 +199,14 @@ class DAQHandler:
         time.sleep(1)
         self.minv = self.read_voltage_mean(1000)
     
+    def set(self):
+        if(self.channelType=="D"):
+            self.task.write(1)
+
+    def reset(self):
+        if(self.channelType=="D"):
+            self.task.write(0)
+    
+    def toggle(self):
+        if(self.channelType=="D"):
+            self.task.write(not self.task.read())

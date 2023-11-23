@@ -40,7 +40,8 @@ class GraphicsHandler:
         self.xPos_CirL = self.midX - (self.box_width / 2 + self.circle_radius)
         self.xPos_CirR = self.midX + (self.box_width / 2 + self.circle_radius)
         self.yPos_Cir = self.midY
-        
+
+        self.scale = 1 # 1 is no scale 
 
         # define circle position parameters
         self.CirclePos_max =  self.width/2  - self.box_width/2 - self.circle_radius
@@ -73,28 +74,27 @@ class GraphicsHandler:
     def updatePosition(self, x_input):
         squeezing = (x_input >= self.x_touchPoint)
         if squeezing:
-            vibrate = False
+            self.vibrate = False
             portion =  (x_input - self.x_touchPoint) / (self.x_max - self.x_touchPoint)
             scale = self.max_scale * portion
             self.scale = scale + 1
             circleRaduisH = round(self.circle_radius/self.scale)
-            xPos_CirL = self.xPos_Box - circleRaduisH * (1 - self.intersection*portion) +1
+            self.xPos_CirL = self.xPos_Box - circleRaduisH * (1 - self.intersection*portion) +1
             if portion > 0.9:
                 color = self.finalColor
             else:
                 color = self.startColor 
         else:
-            vibrate = True
+            self.vibrate = True
             portion =  (x_input - self.x_min) / (self.x_touchPoint - self.x_min)
             self.scale = 1 # 1 is no scale
-            xPos_CirL = self.CirclePos_min + self.dCircle* portion
+            self.xPos_CirL = self.CirclePos_min + self.dCircle* portion
             color = self.startColor
         
-        xPos_CirR = self.width - xPos_CirL
-        return xPos_CirL, xPos_CirR, color
+        self.xPos_CirR = self.width - self.xPos_CirL
+        return 
 
-    def draw(self, x_input):
-        self.xPos_CirL, self.xPos_CirR, color = self.updatePosition(x_input)
+    def draw(self):
         self.screen.fill(self.black)
         self.screen.blit(self.circle, (round(self.xPos_CirR-self.circle_radius/self.scale), self.yPos_Cir-self.circle_radius*self.scale)) 
         self.screen.blit(self.circle, (round(self.xPos_CirL-self.circle_radius/self.scale), self.yPos_Cir-self.circle_radius*self.scale))
