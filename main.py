@@ -4,6 +4,7 @@ from scipy.interpolate import interp1d
 import pygame
 import time
 import threading
+from nidaqmx import constants
 
 
 # global
@@ -19,7 +20,9 @@ def main():
     
     graphics_handler = GraphicsHandler(800, 600)
     AnalogInput = DAQHandler("Dev3/ai0")
-    
+    AnalogInput.task.timing.cfg_samp_clk_timing(800, sample_mode= constants.AcquisitionType.CONTINUOUS)
+
+
     DOut = DAQHandler("Dev3/port0/line0")
     
     accepted = False
@@ -39,7 +42,7 @@ def main():
 
     # graphics loop
     clock = pygame.time.Clock()
-    FPS = 60
+    FPS = 80
     screen_refresh_count = 0
     screen_start_time = time.time()
 
@@ -51,6 +54,7 @@ def main():
                 running = False
 
         graphics_handler.draw()
+        DOut.task.write(bool(graphics_handler.vibrate))
 
         screen_refresh_count += 1
         screen_current_time = time.time()
@@ -75,7 +79,6 @@ def voltage_reader(AnalogInput, DigitalOutput, mapper ,graphics_handler):
         voltage = min(AnalogInput.minv, max(AnalogInput.maxv, voltage))
         x_input = mapper(voltage)
         graphics_handler.updatePosition(x_input)
-        DigitalOutput.task.write(bool(graphics_handler.vibrate))
         daq_readings_count += 1
         daq_current_time = time.perf_counter_ns()
         if daq_readings_count % 10 == 0:
