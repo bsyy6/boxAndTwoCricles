@@ -20,7 +20,7 @@ def main():
     
     graphics_handler = GraphicsHandler(800, 600)
     AnalogInput = DAQHandler("Dev3/ai0")
-    AnalogInput.task.timing.cfg_samp_clk_timing(800, sample_mode= constants.AcquisitionType.CONTINUOUS)
+    AnalogInput.task.timing.cfg_samp_clk_timing(1000, sample_mode= constants.AcquisitionType.CONTINUOUS)
 
 
     DOut = DAQHandler("Dev3/port0/line0")
@@ -71,7 +71,7 @@ def main():
     graphics_handler.close()
 
 # runs in different thread
-def voltage_reader(AnalogInput, DigitalOutput, mapper ,graphics_handler):
+def voltage_reader(AnalogInput, Digitalnput, mapper ,graphics_handler):
     daq_start_time = time.perf_counter_ns()
     daq_readings_count = 0; 
     while not closeThread:
