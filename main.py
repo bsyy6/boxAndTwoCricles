@@ -20,7 +20,6 @@ def main():
     
     graphics_handler = GraphicsHandler(800, 600)
     AnalogInput = DAQHandler("Dev3/ai0")
-    AnalogInput.task.timing.cfg_samp_clk_timing(1000, sample_mode= constants.AcquisitionType.CONTINUOUS)
 
 
     DOut = DAQHandler("Dev3/port0/line0")
@@ -35,10 +34,32 @@ def main():
 
     mapper = interp1d([AnalogInput.minv, AnalogInput.maxv], [graphics_handler.x_max,graphics_handler.x_min])
     
+    # stop the task
+    AnalogInput.task.stop()
+    AnalogInput.task.timing.cfg_samp_clk_timing(800, sample_mode= constants.AcquisitionType.CONTINUOUS)
+    
+    daq_start_time = time.perf_counter_ns()
+    daq_readings_count = 0
+    
+    def callbackFunction (task_handle, every_n_samples_event_type, number_of_samples, callback_data):
+        nonlocal daq_start_time
+        nonlocal daq_readings_count
+        voltage = AnalogInput.moving_median(100)
+        voltage = min(AnalogInput.minv, max(AnalogInput.maxv, voltage))
+        x_input = mapper(voltage)
+        graphics_handler.updatePosition(x_input)
+        daq_readings_count = daq_readings_count + 1
+        daq_current_time = time.perf_counter_ns()
+        if daq_readings_count % 10 == 0:
+            elapsed_time = daq_current_time - daq_start_time
+            if elapsed_time != 0:
+                frequency = daq_readings_count / elapsed_time / 1e-9
+                print(f"Daq: {frequency:.2f} Hz | {fps:.2f} FPS")
+        return 0
+    
+    AnalogInput.task.register_every_n_samples_acquired_into_buffer_event(1, callbackFunction)
+    AnalogInput.task.start()
 
-    # start voltage reader thread
-    voltage_reader_thread = threading.Thread(target=voltage_reader, args=(AnalogInput, DOut,mapper, graphics_handler), daemon=True)
-    voltage_reader_thread.start()
 
     # graphics loop
     clock = pygame.time.Clock()
@@ -71,21 +92,6 @@ def main():
     graphics_handler.close()
 
 # runs in different thread
-def voltage_reader(AnalogInput, Digitalnput, mapper ,graphics_handler):
-    daq_start_time = time.perf_counter_ns()
-    daq_readings_count = 0; 
-    while not closeThread:
-        voltage = AnalogInput.moving_median(100)
-        voltage = min(AnalogInput.minv, max(AnalogInput.maxv, voltage))
-        x_input = mapper(voltage)
-        graphics_handler.updatePosition(x_input)
-        daq_readings_count += 1
-        daq_current_time = time.perf_counter_ns()
-        if daq_readings_count % 10 == 0:
-            elapsed_time = daq_current_time - daq_start_time
-            if elapsed_time != 0:
-                frequency = daq_readings_count / elapsed_time / 1e-9
-                print(f"Daq: {frequency:.2f} Hz | {fps:.2f} FPS")
 
 
 if __name__ == "__main__":

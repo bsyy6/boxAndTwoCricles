@@ -81,7 +81,10 @@ class DAQHandler:
         if foundDaq:
             self.task = nidaqmx.Task()
             self.add_channel(self.channel, terminal_config=terminal_config, min_val=min_val, max_val=max_val)
+            # initialize the object variables
             self.data = [] # for moving fitlers
+            self.daq_readings_count = 0 # to check the frequency
+            self.daq_start_time = 0 # ns
             print("connected")
         else:
             print("No DAQ found.")

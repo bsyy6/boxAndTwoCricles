@@ -52,6 +52,7 @@ class GraphicsHandler:
         self.x_touchPoint = 4
         self.x_max = 10
         self.x_min = 0
+        self.vibrate = True
 
 
     def makeBox(self, box_width, color):
