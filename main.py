@@ -27,15 +27,23 @@ def main():
     DigitalInput.di_channels.add_di_chan("Dev3/port0/line1")
 
     # the vibration
-    DOut = DAQHandler("Dev3/port0/line0")
+    DigitalOutput = DAQHandler("Dev3/port0/line0")
     
-    accepted = False
-
+    accepted = True
+    AnalogInput.maxv = 1.7
+    AnalogInput.minv = 3.0
     while(not accepted):
         AnalogInput.getMax()
         AnalogInput.getMin() 
+
         print(f"Open: {AnalogInput.maxv} Close: {AnalogInput.minv}")
         accepted = input("Are these values acceptable? (y/n) ") == "y"
+
+    # the button thread
+    DigitalInput.start()
+    buttonIsPressed = DigitalInput.read() # initial state
+    DigitalInput.stop()
+    debounce_time = 0.1  # Adjust the debounce time as needed 
 
     mapper = interp1d([AnalogInput.minv, AnalogInput.maxv], [graphics_handler.x_max,graphics_handler.x_min])
     
@@ -52,6 +60,8 @@ def main():
         voltage = AnalogInput.moving_median(100)
         voltage = min(AnalogInput.minv, max(AnalogInput.maxv, voltage))
         x_input = mapper(voltage)
+        # in case 
+        graphics_handler.buttonIsPressed = buttonIsPressed
         graphics_handler.updatePosition(x_input)
         daq_readings_count = daq_readings_count + 1
         daq_current_time = time.perf_counter_ns()
@@ -65,9 +75,6 @@ def main():
     AnalogInput.task.register_every_n_samples_acquired_into_buffer_event(1, callbackFunction)
     AnalogInput.task.start()
 
-    # the button thread
-    buttonIsPressed = False
-    debounce_time = 0.1  # Adjust the debounce time as needed 
     last_edge_time = time.time()
 
     def buttonCallback(task_handle, every_n_samples_event_type, number_of_samples, callback_data):
@@ -82,13 +89,13 @@ def main():
         if time_passed > debounce_time:
             if button_state and not buttonIsPressed:
                 buttonIsPressed = True
-                #print("Digital input changed state: Button_state")
+                print("Digital input changed state: Pressed")
                 last_edge_time = current_time
             elif not button_state and buttonIsPressed:
                 buttonIsPressed = False
-                #print("Digital input changed state: Released")
+                print("Digital input changed state: Released")
                 last_edge_time = current_time
-            graphics_handler.onBase = buttonIsPressed
+            graphics_handler.buttonIsPressed = buttonIsPressed
         return 0
         
     DigitalInput.timing.cfg_change_detection_timing(rising_edge_chan="Dev3/port0/line1",
@@ -110,9 +117,8 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
         graphics_handler.draw()
-        DOut.task.write(bool(graphics_handler.vibrate))
+        DigitalOutput.task.write(bool(graphics_handler.vibrate))
 
         screen_refresh_count += 1
         screen_current_time = time.time()

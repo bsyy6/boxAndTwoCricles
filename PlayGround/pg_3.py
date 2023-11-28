@@ -38,7 +38,7 @@ def main():
     
     time.sleep(4)
     
-    global x 
+    x 
     x = [20,30]  # Pass any value or object you need
 
     print("created callback")
@@ -47,7 +47,8 @@ def main():
     AnalogInput.task.timing.cfg_samp_clk_timing(1, sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
     
    
-    def print_new_data(task_handle, every_n_samples_event_type, number_of_samples, callback_data = x):
+    def print_new_data(task_handle, every_n_samples_event_type, number_of_samples, callback_data):
+        nonlocal x
         print(f"x from callback : {x[1]}")
         x[1] += 1
         return 0

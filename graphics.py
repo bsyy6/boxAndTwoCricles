@@ -7,7 +7,6 @@ class GraphicsHandler:
         self.width = width
         self.height = height
         self.screen = pygame.display.set_mode((self.width, self.height))
-        
         self.midX = self.width / 2
         self.midY = self.height / 2
 
@@ -19,8 +18,8 @@ class GraphicsHandler:
         self.blue = (0, 0, 255)
 
         # interaction parameters
-        self.max_scale = 0.1
-        self.intersection = 0.1
+        self.max_scale = 0 # it was 0.1
+        self.intersection = 0 # it was 0.1
         self.startColor = self.black
         self.finalColor = self.white
         self.dcolor = tuple(np.subtract(self.finalColor,self.startColor))
@@ -31,7 +30,7 @@ class GraphicsHandler:
         # position on screen
         self.xPos_Box = self.midX - self.box_width / 2
         self.yPos_Box = self.midY - self.box_width / 2
-
+        
         # define circle parameters
         self.circle_radius = 50
         self.circle = self.makeCircle(self.circle_radius,self.red)
@@ -53,8 +52,9 @@ class GraphicsHandler:
         self.x_max = 10
         self.x_min = 0
         self.vibrate = True
-
-
+        self.buttonIsPressed = False
+        self.cubeInHand = False
+                
     def makeBox(self, box_width, color):
         box = pygame.Surface((box_width, box_width), pygame.SRCALPHA)
         pygame.draw.rect(box, color, (0, 0, box_width, box_width))
@@ -93,10 +93,43 @@ class GraphicsHandler:
             color = self.startColor
         
         self.xPos_CirR = self.width - self.xPos_CirL
+
+        # swich based on button is pressed or not
+        maxHeight = (self.height - self.box_width)/4
+        
+        if self.buttonIsPressed:
+            if squeezing:
+                self.cubeInHand = True
+                if ((self.yPos_Box + self.box_width/2) <= self.midY):
+                    self.yPos_Box +=  1
+                    self.yPos_Cir = self.yPos_Box + self.box_width/2
+            else:
+                if(self.yPos_Cir < self.midY):
+                    self.yPos_Cir += 1
+                self.cubeInHand = False
+        else:
+            if squeezing and self.cubeInHand:
+                if(self.yPos_Box > maxHeight):
+                    self.yPos_Box -= 1
+                self.yPos_Cir = self.yPos_Box + self.box_width/2
+
+            else:
+                #drop the box
+                if((self.yPos_Box+self.box_width/2) < self.midY):
+                    self.yPos_Box = self.yPos_Box + 1
+                    self.cubeInHand = False 
+                #move the cricles up
+                if(self.yPos_Cir > maxHeight+ self.box_width/2):
+                    self.yPos_Cir -= 1
+                    if(self.yPos_Cir < maxHeight+ self.box_width/2):
+                        self.yPos_Cir = maxHeight+ self.box_width/2
+
         return 
 
     def draw(self):
         self.screen.fill(self.black)
+        pygame.draw.line(self.screen, self.white, (0, (self.height - self.box_width)/2), (self.width, (self.height - self.box_width)/2), 1)
+
         self.screen.blit(self.circle, (round(self.xPos_CirR-self.circle_radius/self.scale), self.yPos_Cir-self.circle_radius*self.scale)) 
         self.screen.blit(self.circle, (round(self.xPos_CirL-self.circle_radius/self.scale), self.yPos_Cir-self.circle_radius*self.scale))
         self.screen.blit(self.box, (self.xPos_Box, self.yPos_Box))
