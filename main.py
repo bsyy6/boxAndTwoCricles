@@ -4,8 +4,7 @@ from scipy.interpolate import interp1d
 import pygame
 import time
 import threading
-from nidaqmx import constants
-
+import nidaqmx
 
 # global
 fps = 0 # the fps counter 
@@ -19,9 +18,15 @@ def main():
     pygame.init()
     
     graphics_handler = GraphicsHandler(800, 600)
+    
+    # distance between finger
     AnalogInput = DAQHandler("Dev3/ai0")
+    
+    # the button
+    DigitalInput = nidaqmx.Task()
+    DigitalInput.di_channels.add_di_chan("Dev3/port0/line1")
 
-
+    # the vibration
     DOut = DAQHandler("Dev3/port0/line0")
     
     accepted = False
@@ -34,9 +39,9 @@ def main():
 
     mapper = interp1d([AnalogInput.minv, AnalogInput.maxv], [graphics_handler.x_max,graphics_handler.x_min])
     
-    # stop the task
+    # stop the task (Analog) for distance between fingers
     AnalogInput.task.stop()
-    AnalogInput.task.timing.cfg_samp_clk_timing(800, sample_mode= constants.AcquisitionType.CONTINUOUS)
+    AnalogInput.task.timing.cfg_samp_clk_timing(800, sample_mode= nidaqmx.constants.AcquisitionType.CONTINUOUS)
     
     daq_start_time = time.perf_counter_ns()
     daq_readings_count = 0
@@ -54,12 +59,44 @@ def main():
             elapsed_time = daq_current_time - daq_start_time
             if elapsed_time != 0:
                 frequency = daq_readings_count / elapsed_time / 1e-9
-                print(f"Daq: {frequency:.2f} Hz | {fps:.2f} FPS")
+                #print(f"Daq: {frequency:.2f} Hz | {fps:.2f} FPS")
         return 0
     
     AnalogInput.task.register_every_n_samples_acquired_into_buffer_event(1, callbackFunction)
     AnalogInput.task.start()
 
+    # the button thread
+    buttonIsPressed = False
+    debounce_time = 0.1  # Adjust the debounce time as needed 
+    last_edge_time = time.time()
+
+    def buttonCallback(task_handle, every_n_samples_event_type, number_of_samples, callback_data):
+        
+        nonlocal buttonIsPressed, last_edge_time
+
+        button_state = DigitalInput.read()
+        current_time = time.time()
+        
+        time_passed = current_time - last_edge_time
+        
+        if time_passed > debounce_time:
+            if button_state and not buttonIsPressed:
+                buttonIsPressed = True
+                #print("Digital input changed state: Button_state")
+                last_edge_time = current_time
+            elif not button_state and buttonIsPressed:
+                buttonIsPressed = False
+                #print("Digital input changed state: Released")
+                last_edge_time = current_time
+            graphics_handler.onBase = buttonIsPressed
+        return 0
+        
+    DigitalInput.timing.cfg_change_detection_timing(rising_edge_chan="Dev3/port0/line1",
+                                                    falling_edge_chan="Dev3/port0/line1",
+                                                    sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
+
+    DigitalInput.register_every_n_samples_acquired_into_buffer_event(1, buttonCallback)
+    DigitalInput.start()
 
     # graphics loop
     clock = pygame.time.Clock()
